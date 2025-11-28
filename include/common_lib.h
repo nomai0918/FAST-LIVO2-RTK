@@ -16,6 +16,7 @@ which is included as part of this source code package.
 #include <utils/so3_math.h>
 #include <utils/types.h>
 #include <utils/color.h>
+#include <utils/spline.h>
 #include <opencv2/opencv.hpp>
 #include <sensor_msgs/Imu.h>
 #include <sophus/se3.h>
@@ -59,16 +60,24 @@ enum EKF_STATE
   LO = 3
 };
 
+struct RTK
+{
+    double timestamp;
+    Eigen::Vector3d p;
+};
+
 struct MeasureGroup
 {
   double vio_time;
   double lio_time;
+  RTK rtk;
   deque<sensor_msgs::Imu::ConstPtr> imu;
   cv::Mat img;
   MeasureGroup()
   {
     vio_time = 0.0;
     lio_time = 0.0;
+    rtk.timestamp = 0.0;
   };
 };
 
@@ -241,4 +250,24 @@ auto set_pose6d(const double t, const Matrix<T, 3, 1> &a, const Matrix<T, 3, 1> 
   return move(rot_kp);
 }
 
+#include <iostream>
+#include <string>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+
+class common_lib
+{
+  public:
+    template<typename T> 
+    float pointDistance(const T& p)
+    { 
+      return sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+    }
+
+    template<typename T>
+    float pointDistance(const T& p1, const T& p2)
+    {
+      return sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y) + (p1.z - p2.z) * (p1.z - p2.z));
+    }
+};
 #endif

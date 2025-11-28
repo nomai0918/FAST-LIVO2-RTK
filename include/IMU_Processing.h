@@ -45,8 +45,9 @@ public:
   void disable_gravity_est();
   void disable_bias_est();
   void disable_exposure_est();
-  void Process2(LidarMeasureGroup &lidar_meas, StatesGroup &stat, PointCloudXYZI::Ptr cur_pcl_un_);
+  void Process2(LidarMeasureGroup &lidar_meas, StatesGroup &stat, PointCloudXYZI::Ptr cur_pcl_un_, Sophus::SE3 T_G_to_W);
   void UndistortPcl(LidarMeasureGroup &lidar_meas, StatesGroup &state_inout, PointCloudXYZI &pcl_out);
+  void GetRTKCorrectedState(LidarMeasureGroup &lidar_meas, const StatesGroup &state_in, Sophus::SE3 T_G_to_W);
 
   ofstream fout_imu;
   double IMU_mean_acc_norm;

@@ -31,7 +31,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|aarch64|ARM|AARCH64)")
   add_definitions(-DARM_ARCH)
 else()
   # x86-64 (Intel/AMD) optimizations
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -mtune=native -funroll-loops") #-flto
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -funroll-loops") #-flto
   message(STATUS "Using general x86 optimizations: -O3 -march=native -mtune=native -funroll-loops") 
   add_definitions(-DX86_ARCH)
 endif()
@@ -78,6 +78,7 @@ endif()
 # Find catkin and required dependencies
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
+  gnss_comm
   nav_msgs
   sensor_msgs
   roscpp
@@ -98,6 +99,9 @@ find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Sophus REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
+find_package(GeographicLib REQUIRED)
+find_package(GTSAM REQUIRED QUIET)
+find_package(Boost REQUIRED COMPONENTS timer)
 
 set(Sophus_LIBRARIES libSophus.so)
 
@@ -114,6 +118,8 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
   ${Sophus_INCLUDE_DIRS}
+  ${GeographicLib_INCLUDE_DIRS}
+  ${GTSAM_INCLUDE_DIR}
   include
 )
 
@@ -123,6 +129,7 @@ add_library(lio src/voxel_map.cpp)
 add_library(pre src/preprocess.cpp)
 add_library(imu_proc src/IMU_Processing.cpp)
 add_library(laser_mapping src/LIVMapper.cpp)
+add_library(optimization src/optimization.cpp)
 
 # Add the main executable
 add_executable(fastlivo_mapping src/main.cpp)
@@ -134,11 +141,14 @@ target_link_libraries(fastlivo_mapping
   lio
   pre
   imu_proc
+  optimization
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Sophus_LIBRARIES}
   ${Boost_LIBRARIES}
+  ${GeographicLib_LIBRARIES}
+  gtsam
 )
 
 # Link mimalloc if found

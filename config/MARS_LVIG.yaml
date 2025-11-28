@@ -4,25 +4,30 @@ common:
   imu_topic: "/livox/imu"
   img_en: 1
   lidar_en: 1
+  save_data: false
   ros_driver_bug_fix: false
 
 extrin_calib:
   extrinsic_T: [0.04165, 0.02326, -0.0284]
   extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
   # MARS_LVIG HKisland HKairport
-  Rcl: [0.00438814,-0.999807,-0.0191582,
-        -0.00978695,0.0191145,-0.999769,
-        0.999942,0.00457463,-0.00970118]
-  Pcl: [0.016069, 0.0871753, -0.0718021]
+  # Rcl: [0.00438814,-0.999807,-0.0191582,
+  #       -0.00978695,0.0191145,-0.999769,
+  #       0.999942,0.00457463,-0.00970118]
+  # Pcl: [0.016069, 0.0871753, -0.0718021]
   # MARS_LVIG AMtown AMvalley
-  # Rcl: [ -0.0022464, -0.9997299, -0.0231319,
-  #        -0.0084211,  0.0231501, -0.9996966,
-  #         0.9999620, -0.0020509, -0.0084708]
-  # Pcl: [-0.0025563, 0.0567484, -0.0512149]
+
+  Rcl: [ -0.010986, -0.999937,  0.002338,
+        -0.007770, -0.002253, -0.999967,
+        0.999909, -0.011004, -0.007745]
+  Pcl: [ -0.061281,  0.036577, -0.038252]
+
+
+
 
 time_offset: 
   imu_time_offset: 0.0
-  img_time_offset: -0.1
+  img_time_offset: 0.1  
   exposure_time_init: 0.0
 # ╔═══════════════════════════════════════════════════════════════════════════════════════╗
 # ║                     Configuration Settings                                            ║
@@ -55,7 +60,7 @@ preprocess:
 vio:
   max_iterations: 5
   outlier_threshold: 1000 # 78 100 156 #100 200 500 700 infinite
-  img_point_cov: 1000 # 100 1000 
+  img_point_cov: 100 # 100 1000 
   patch_size: 8
   patch_pyrimid_level: 4
   normal_en: true
@@ -67,17 +72,18 @@ vio:
 imu:
   imu_en: true
   imu_int_frame: 30
-  acc_cov: 2.0 # 0.5
-  gyr_cov: 0.1 # 0.3
+  acc_cov: 0.05 # 0.5
+  gyr_cov: 0.03 # 0.3
   b_acc_cov: 0.0001 # 0.1
   b_gyr_cov: 0.0001 # 0.1
+  ba_bg_est_en: true
 
 lio:
   max_iterations: 5
   dept_err: 0.02
   beam_err: 0.05
   min_eigen_value: 0.005
-  voxel_size: 2.0 # 1.0
+  voxel_size: 0.5 # 1.0
   max_layer: 2
   max_points_num: 50
   layer_init_num: [5, 5, 5, 5, 5]
@@ -109,3 +115,34 @@ pcd_save:
   interval: -1
   # how many LiDAR frames saved in each pcd file;
   # -1 : all frames will be saved in ONE pcd file, may lead to memory crash when having too much frames.
+
+gps:
+  gps_offset: 0
+  gps_en: true
+  #extrinsic_T: [-0.00325, 0.02554, 0.10247]
+  extrinsic_T: [-0.0588, 0.02316, 0.1162]
+  # extrinsic_T: [0, 0, 0]
+  gps_topic: "/ublox_driver/receiver_lla"
+  optimization_mode: "offline"
+  gps_tum_output_path: "/home/nomai/ws_fastlivo2_rtk/src/FAST-LIVO2/TUM/gps_trajectory.txt"
+  opt_tum_output_path: "/home/nomai/ws_fastlivo2_rtk/src/FAST-LIVO2/TUM/opt_trajectory.txt"
+  global_map_pcd_path:  "//home/nomai/ws_fastlivo2_rtk/src/FAST-LIVO2/PCD/"
+  save_pcd_directory: "/home/nomai/ws_fastlivo2_rtk/src/FAST-LIVO2/scan_pcd"
+  gps_cov_threshold: 2.0
+  pose_cov_threshold: 25.0
+  surroundingkeyframeAddingDistThreshold: 1.0
+  surroundingkeyframeAddingAngleThreshold: 0.2
+  
+loop:
+  loop_en: false
+  searchRadius: 10.0
+  timeThreshold: 100.0
+  fitnessScore: 0.5
+  voxelLeafSize: 0.1
+
+opt:
+  load_data: false
+  rtk_cov: 0.1
+  livo2_RPY_cov: 0.00000001
+  livo2_XYZ_cov: 0.0001
+  loop_cov: 0.000001

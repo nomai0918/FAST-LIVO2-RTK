@@ -20,7 +20,7 @@ which is included as part of this source code package.
 #include <image_transport/image_transport.h>
 #include <nav_msgs/Path.h>
 #include <vikit/camera_loader.h>
-
+#include "rtk_ekf.h"
 class LIVMapper
 {
 public:
@@ -35,6 +35,7 @@ public:
   void stateEstimationAndMapping();
   void handleVIO();
   void handleLIO();
+  void handleRTK();
   void savePCD();
   void processImu();
   
@@ -49,6 +50,8 @@ public:
   void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg_in);
   void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in);
   void img_cbk(const sensor_msgs::ImageConstPtr &msg_in);
+  void rtk_cbk(const gnss_comm::GnssPVTSolnMsg::ConstPtr& gpsMsg);
+  void InitializeRTK();
   void publish_img_rgb(const image_transport::Publisher &pubImage, VIOManagerPtr vio_manager);
   void publish_frame_world(const ros::Publisher &pubLaserCloudFullRes, VIOManagerPtr vio_manager);
   void publish_visual_sub_map(const ros::Publisher &pubSubVisualMap);
@@ -158,12 +161,14 @@ public:
   ImuProcessPtr p_imu;
   VoxelMapManagerPtr voxelmap_manager;
   VIOManagerPtr vio_manager;
+  GeographicLib::LocalCartesian gps_trans_;
 
   ros::Publisher plane_pub;
   ros::Publisher voxel_pub;
   ros::Subscriber sub_pcl;
   ros::Subscriber sub_imu;
   ros::Subscriber sub_img;
+  ros::Subscriber subGPS_pvt;
   ros::Publisher pubLaserCloudFullRes;
   ros::Publisher pubNormal;
   ros::Publisher pubSubVisualMap;
@@ -183,5 +188,29 @@ public:
   double aver_time_icp = 0;
   double aver_time_map_inre = 0;
   bool colmap_output_en = false;
+
+  bool rtk_en = true;
+  bool rtk_ini = false;
+  std::deque<RTK> rtk_buffer;
+  std::deque<RTK> rtk_proc_buffer;
+  std::deque<std::vector<double>> livo_state_buffer;
+  Sophus::SE3 T_W_to_G;
+  Sophus::SE3 T_G_to_W;
+  vector<double> T_I_R;
+
+  int pcd_file_index = 0;
+  bool save_data = false;
+  std::string save_directory = "/home/nomai/ws_fastlivo2_rtk/src/FAST-LIVO2/DATA/";
+  std::string pcd_save_file = save_directory + "pcd/";
+  std::string rtk_save_file = save_directory + "rtk.txt";
+  std::string imu_save_file = save_directory + "imu.txt";
+  std::string odom_save_file = save_directory + "odom.txt"; 
+  std::string cov_save_file  = save_directory + "cov.txt"; 
+  
+  double keyframe_time = 0.0;
+
+  ros::Subscriber sub_gps;
+  ros::Publisher pub_odom;
+  ros::Publisher pub_lidarRGB;
 };
 #endif
