@@ -63,7 +63,8 @@ enum EKF_STATE
 struct RTK
 {
     double timestamp;
-    Eigen::Vector3d p;
+    V3D p;
+    V3D v;
 };
 
 struct MeasureGroup

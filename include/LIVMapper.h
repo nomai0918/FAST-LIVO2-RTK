@@ -189,8 +189,9 @@ public:
   double aver_time_map_inre = 0;
   bool colmap_output_en = false;
 
-  bool rtk_en = true;
+  bool rtk_en = false;
   bool rtk_ini = false;
+  bool rtk_good = false;
   std::deque<RTK> rtk_buffer;
   std::deque<RTK> rtk_proc_buffer;
   std::deque<std::vector<double>> livo_state_buffer;
@@ -212,5 +213,6 @@ public:
   ros::Subscriber sub_gps;
   ros::Publisher pub_odom;
   ros::Publisher pub_lidarRGB;
+  ros::Publisher pub_rtk;
 };
 #endif

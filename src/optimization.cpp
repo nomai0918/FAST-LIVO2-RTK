@@ -940,7 +940,7 @@ void optimization::buildBatchGraph()
             double cov_y = it.pose.covariance[7]; 
             double cov_z = it.pose.covariance[14]; 
 
-            gtsam::Vector3 gps_variance(cov_x, cov_y, 100000);
+            gtsam::Vector3 gps_variance(cov_x, cov_y, cov_z);
             auto gps_noise = gtsam::noiseModel::Diagonal::Variances(gps_variance);
             gtSAMgraph.add(gtsam::GPSFactor(i, gps_point, gps_noise));
             aLoopIsClosed = true; 

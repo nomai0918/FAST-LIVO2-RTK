@@ -7,7 +7,7 @@ int main(int argc, char **argv)
   image_transport::ImageTransport it(nh);
   LIVMapper mapper(nh); 
 
-  //optimization opti(nh);
+  optimization opti(nh);
 
 
   mapper.initializeSubscribersAndPublishers(nh, it);

@@ -335,7 +335,7 @@ VoxelOctoTree *VoxelOctoTree::Insert(const pointWithVar &pv)
   return nullptr;
 }
 
-void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
+void VoxelMapManager::StateEstimation(StatesGroup &state_propagat, bool rtk_good, V3D rtk_means)
 {
   cross_mat_list_.clear();
   cross_mat_list_.reserve(feats_down_size_);
@@ -406,6 +406,11 @@ void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
 
     /*** Computation of Measuremnt Jacobian matrix H and measurents covarience
      * ***/
+    if(rtk_good)
+    {
+      effct_feat_num_ += 3;
+    }
+
     MatrixXd Hsub(effct_feat_num_, 6);
     MatrixXd Hsub_T_R_inv(6, effct_feat_num_);
     VectorXd R_inv(effct_feat_num_);
@@ -456,6 +461,56 @@ void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
           ptpl_list_[i].normal_[1] * R_inv(i), ptpl_list_[i].normal_[2] * R_inv(i);
       meas_vec(i) = -ptpl_list_[i].dis_to_plane_;
     }
+
+    if (rtk_good)
+    {
+        ROS_INFO("RTK update in EKF.");
+        
+        int rtk_start_idx = effct_feat_num_ - 3;
+        
+         
+        V3D rtk_ext_t;  
+        //rtk_ext_t << -0.0588, 0.02316, 0.1162;
+        rtk_ext_t << 0, 0, 0;
+        V3D rtk_std;    
+        rtk_std << 0.003, 0.003, 0.1; 
+
+        V3D rtk_est = state_.pos_end + state_.rot_end * rtk_ext_t;
+        V3D rtk_residual = rtk_means - rtk_est; 
+        ROS_INFO("rtk_residual: [%f, %f, %f]", rtk_residual[0], rtk_residual[1], rtk_residual[2]);
+
+        // H_RTK 计算
+        M3D rtk_ext_t_skew;
+        rtk_ext_t_skew << SKEW_SYM_MATRX(rtk_ext_t);
+        //M3D rtk_rot_jacobian = -state_.rot_end * rtk_ext_t_skew; 
+        M3D rtk_rot_jacobian;
+        rtk_rot_jacobian.setZero();
+
+        M3D rtk_pos_jacobian = M3D::Identity();
+
+        for (int k = 0; k < 3; k++)
+        {
+            int row_idx = rtk_start_idx + k;
+
+            double curr_rtk_cov = rtk_std[k] * rtk_std[k]; 
+            R_inv(row_idx) = 1.0 / curr_rtk_cov;
+
+            //H_sub , H_T_R_inv, meas_vec 计算
+            Hsub.row(row_idx) << rtk_rot_jacobian(k, 0), rtk_rot_jacobian(k, 1), rtk_rot_jacobian(k, 2),
+                                 rtk_pos_jacobian(k, 0), rtk_pos_jacobian(k, 1), rtk_pos_jacobian(k, 2);
+
+            Hsub_T_R_inv.col(row_idx) << rtk_rot_jacobian(k, 0) * R_inv(row_idx),
+                                         rtk_rot_jacobian(k, 1) * R_inv(row_idx),
+                                         rtk_rot_jacobian(k, 2) * R_inv(row_idx),
+                                         rtk_pos_jacobian(k, 0) * R_inv(row_idx),
+                                         rtk_pos_jacobian(k, 1) * R_inv(row_idx),
+                                         rtk_pos_jacobian(k, 2) * R_inv(row_idx);
+
+            meas_vec(row_idx) = rtk_residual(k);
+        }
+
+    }
+
     EKF_stop_flg = false;
     flg_EKF_converged = false;
     /*** Iterative Kalman Filter Update ***/

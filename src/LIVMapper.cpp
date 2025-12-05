@@ -110,8 +110,10 @@ void LIVMapper::readParameters(ros::NodeHandle &nh)
   nh.param<bool>("publish/dense_map_en", dense_map_en, false);
 
   nh.param<bool>("common/save_data", save_data, false);
-  nh.param<vector<double>>("gps/extrinsic_T", T_I_R, vector<double>());
   p_pre->blind_sqr = p_pre->blind * p_pre->blind;
+
+  //nh.param<bool>("gps/gps_en", rtk_en, false);
+  nh.param<vector<double>>("gps/extrinsic_T", T_I_R, vector<double>());
 }
 
 void LIVMapper::initializeComponents() 
@@ -198,7 +200,8 @@ void LIVMapper::initializeSubscribersAndPublishers(ros::NodeHandle &nh, image_tr
   
   pub_odom = nh.advertise<nav_msgs::Odometry>("/odometry/fast_livo2", 10000);
   pub_lidarRGB = nh.advertise<sensor_msgs::PointCloud2>("/synced_cloud", 10000);
-  //pub_gps = nh.advertise<nav_msgs::Odometry>("/gps/odometry", 10000);
+  pub_rtk = nh.advertise<nav_msgs::Odometry>("/gps/odometry", 10000);
+
 
   pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>("/cloud_registered", 100);
   pubNormal = nh.advertise<visualization_msgs::MarkerArray>("visualization_marker", 100);
@@ -276,42 +279,49 @@ void LIVMapper::stateEstimationAndMapping()
       break;
     case LIO:
     case LO:
-    if(rtk_en && rtk_ini)
-    {
-      handleRTK();
-    }
       handleLIO();
-      ROS_INFO("[HandleLIO] state_after Position: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
-      ROS_INFO("[HandleLIO] P after: %.12f, %.12f, %.12f, %.12f, %.12f, %.12f", _state.cov(0,0), _state.cov(1,1), _state.cov(2,2), _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
+      ROS_INFO("[HandleLIO] Position after: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
+      ROS_INFO("[HandleLIO] p_cov after: %.12f, %.12f, %.12f", _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
+
+      // if(rtk_en && rtk_ini)
+      // {
+      //   handleRTK();
+      // }
       break;
   }
 }
 
 void LIVMapper::handleRTK()
 {
-  ROS_INFO("[ RTK Update ]");
+  ROS_INFO("%s[ RTK Update ]%s", BLUE, RESET);
   if (LidarMeasures.measures.empty()) 
   {
       return; 
   }
 
   auto rtk_data = LidarMeasures.measures.back().rtk; 
+  if(rtk_data.timestamp < 0.00001)
+  {
+    return;
+  }
 
   std::deque temp_measures = LidarMeasures.measures;
 
   //ROS_INFO("[HandleRTK] rtk_data.p: [%.6f, %.6f, %.6f]", rtk_data.p[0], rtk_data.p[1], rtk_data.p[2]);
   Eigen::Vector3d z_k = rtk_data.p; 
+  z_k[2] = _state.pos_end(2);
   Eigen::Vector3d T_I_to_R;
   T_I_to_R[0] = T_I_R[0];
   T_I_to_R[1] = T_I_R[1];
   T_I_to_R[2] = T_I_R[2];
   ROS_INFO("[HandleRTK] RTK_W: [%f, %f, %f]", z_k(0), z_k(1), z_k(2));
-  ROS_INFO("[HandleRTK] state_before Position: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
-  ROS_INFO("[HandleRTK] P before: %.12f, %.12f, %.12f, %.12f, %.12f, %.12f", 
-         _state.cov(0,0), _state.cov(1,1), _state.cov(2,2), _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
-  //ROS_INFO("RTK Position: [%f, %f, %f]", z_k(0), z_k(1), z_k(2));
+  ROS_INFO("[HandleRTK] Position before: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
+  ROS_INFO("[HandleRTK] p_cov before: %.12f, %.12f, %.12f", _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
+  ROS_INFO("[HandleRTK] Rotation R_before(R1): [%.6f, %.6f, %.6f]", _state.rot_end(0,0), _state.rot_end(0,1), _state.rot_end(0,2));
+  ROS_INFO("[HandleRTK] Rotation R_before(R2): [%.6f, %.6f, %.6f]", _state.rot_end(1,0), _state.rot_end(1,1), _state.rot_end(1,2));
+  ROS_INFO("[HandleRTK] Rotation R_before(R3): [%.6f, %.6f, %.6f]", _state.rot_end(2,0), _state.rot_end(2,1), _state.rot_end(2,2));
 
-  Eigen::Matrix3d R_cov = Eigen::Matrix3d::Identity() * 1e-9;
+  Eigen::Matrix3d R_cov = Eigen::Matrix3d::Identity() * 1e-4 * 5;
 
   
   Eigen::Matrix<double, 3, DIM_STATE> H;
@@ -325,12 +335,7 @@ void LIVMapper::handleRTK()
   ROS_INFO("[HandleRTK] y: [%f, %f, %f]", y(0), y(1), y(2));
   Eigen::Matrix<double, DIM_STATE, 1> dx = K * y;
   ROS_INFO("[HandleRTK] dx: [%f, %f, %f, %f, %f, %f]", dx(0), dx(1), dx(2), dx(3), dx(4), dx(5));
-  _state.rot_end = _state.rot_end * Exp(V3D(dx.segment<3>(0))); 
-  _state.pos_end += V3D(dx.segment<3>(3));
-  _state.inv_expo_time += dx(6);
-  _state.vel_end += V3D(dx.segment<3>(7));
-  _state.bias_g += V3D(dx.segment<3>(10));
-  _state.bias_a += V3D(dx.segment<3>(13));
+  _state += dx;
   
   if (_state.gravity.norm() > 0.1) { 
       _state.gravity += dx.segment<3>(16);
@@ -338,9 +343,11 @@ void LIVMapper::handleRTK()
 
   Eigen::Matrix<double, DIM_STATE, DIM_STATE> I = Eigen::Matrix<double, DIM_STATE, DIM_STATE>::Identity();
   _state.cov = (I - K * H) * P;
-  ROS_INFO("[HandleRTK] state_after Position: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
-  ROS_INFO("[HandleRTK] P after: %.12f, %.12f, %.12f, %.12f, %.12f, %.12f", 
-         _state.cov(0,0), _state.cov(1,1), _state.cov(2,2), _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
+  ROS_INFO("[HandleRTK] Position after: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
+  ROS_INFO("[HandleRTK] p_cov after: %.12f, %.12f, %.12f", _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
+  ROS_INFO("[HandleRTK] Rotation R_after(R1): [%.6f, %.6f, %.6f]", _state.rot_end(0,0), _state.rot_end(0,1), _state.rot_end(0,2));
+  ROS_INFO("[HandleRTK] Rotation R_after(R2): [%.6f, %.6f, %.6f]", _state.rot_end(1,0), _state.rot_end(1,1), _state.rot_end(1,2));
+  ROS_INFO("[HandleRTK] Rotation R_after(R3): [%.6f, %.6f, %.6f]", _state.rot_end(2,0), _state.rot_end(2,1), _state.rot_end(2,2));
   // std::cout << "[RTK Update] Pos Correction: " << dx.segment<3>(3).transpose() << std::endl;
 }
 
@@ -401,9 +408,9 @@ void LIVMapper::handleVIO()
 
 void LIVMapper::handleLIO() 
 {    
-  ROS_INFO("[ LIO Update ]");
-  ROS_INFO("[HandleLIO] state_before Position: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
-  ROS_INFO("[HandleLIO] P before: %.12f, %.12f, %.12f, %.12f, %.12f, %.12f", _state.cov(0,0), _state.cov(1,1), _state.cov(2,2), _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
+  ROS_INFO("%s[ LIO Update ]%s", BLUE, RESET);
+  ROS_INFO("[HandleLIO] Position before: [%f, %f, %f]", _state.pos_end(0), _state.pos_end(1), _state.pos_end(2));
+  ROS_INFO("[HandleLIO] P_cov before: %.12f, %.12f, %.12f", _state.cov(3,3), _state.cov(4,4), _state.cov(5,5));
   euler_cur = RotMtoEuler(_state.rot_end);
   fout_pre << setw(20) << LidarMeasures.last_lio_update_time - _first_lidar_time << " " << euler_cur.transpose() * 57.3 << " "
            << _state.pos_end.transpose() << " " << _state.vel_end.transpose() << " " << _state.bias_g.transpose() << " "
@@ -436,7 +443,18 @@ void LIVMapper::handleLIO()
 
   double t1 = omp_get_wtime();
 
-  voxelmap_manager->StateEstimation(state_propagat);
+  V3D rtk_data = LidarMeasures.measures.back().rtk.p; 
+  if(rtk_ini && LidarMeasures.measures.back().rtk.timestamp > 0.00001)
+  {
+    rtk_good = true;
+  }
+  else
+  {
+    rtk_good = false;
+  }
+  
+  ROS_INFO("[HandleLIO] RTW_W: [%f, %f, %f]", rtk_data(0), rtk_data(1), rtk_data(2));
+  voxelmap_manager->StateEstimation(state_propagat, rtk_good, rtk_data);
   _state = voxelmap_manager->state_;
   _pv_list = voxelmap_manager->pv_list_;
 
@@ -852,16 +870,32 @@ void LIVMapper::rtk_cbk(const gnss_comm::GnssPVTSolnMsg::ConstPtr& gpsMsg)
     gps_trans_.Forward(gpsMsg->latitude, gpsMsg->longitude, gpsMsg->altitude, trans_local_[0], trans_local_[1], trans_local_[2]);
 
     RTK rtk_data;
-    rtk_data.timestamp = stamp.toSec();
+    rtk_data.timestamp = stamp.toSec() - 0.001;
     rtk_data.p[0] = trans_local_[0];
     rtk_data.p[1] = trans_local_[1];
     rtk_data.p[2] = trans_local_[2];
+    rtk_data.v[0] = gpsMsg->vel_e;
+    rtk_data.v[1] = gpsMsg->vel_n;
+    rtk_data.v[2] = -gpsMsg->vel_d;
+    
     rtk_buffer.push_back(rtk_data);
     ROS_INFO("rtk_data_pushed: %.6f, %.3f, %.3f, %.3f", rtk_data.timestamp, rtk_data.p[0], rtk_data.p[1], rtk_data.p[2]);
 
+
+    if(trans_local_.norm() > 50.0 && rtk_ini == false && rtk_en == true)
+    {
+      ROS_INFO("Start INIT RTK to LIVO TRANSFORMATION");
+      InitializeRTK();
+      ROS_INFO("RTK to LIVO TRANSFORMATION INITIALIZED");
+      rtk_ini = true;
+    }
+
+    // if(rtk_ini)
+    // {
+    //trans_local_ = T_G_to_W * Eigen::Vector3d(trans_local_[0], trans_local_[1], trans_local_[2]);
     nav_msgs::Odometry gps_odom;
     gps_odom.header.stamp = stamp; 
-    gps_odom.header.frame_id = "map";
+    gps_odom.header.frame_id = "camera_init";
     gps_odom.pose.pose.position.x = trans_local_[0];
     gps_odom.pose.pose.position.y = trans_local_[1];
     gps_odom.pose.pose.position.z = trans_local_[2];
@@ -873,16 +907,8 @@ void LIVMapper::rtk_cbk(const gnss_comm::GnssPVTSolnMsg::ConstPtr& gpsMsg)
     gps_odom.pose.covariance[7] = gpsMsg->h_acc; 
     gps_odom.pose.covariance[14] = gpsMsg->v_acc; 
 
-
-    if(trans_local_.norm() > 20.0 && rtk_ini == false)
-    {
-      ROS_INFO("Start INIT RTK to LIVO TRANSFORMATION");
-      InitializeRTK();
-      ROS_INFO("RTK to LIVO TRANSFORMATION INITIALIZED");
-      rtk_ini = true;
-    }
-
-
+    pub_rtk.publish(gps_odom);
+    
     if(save_data)
     {
       std::ofstream gps_file(rtk_save_file, std::ios::app); 
@@ -900,7 +926,8 @@ void LIVMapper::rtk_cbk(const gnss_comm::GnssPVTSolnMsg::ConstPtr& gpsMsg)
                   << std::endl;
           gps_file.close();
       }
-    }
+    // }
+  }
 }
 
 Sophus::SE3 computeSVD(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>& target, 

@@ -560,6 +560,7 @@ void ImuProcess::GetRTKCorrectedState(LidarMeasureGroup &lidar_meas, const State
   ROS_INFO("[RTK Corrected State]");
   ROS_INFO("[RTKCorrect] RTK_G.P: %.6f, %.6f, %.6f, RTK time: %.6f", rtk_data.p[0], rtk_data.p[1], rtk_data.p[2], rtk_t);
   rtk_data.p = T_G_to_W * rtk_data.p;
+  rtk_data.v = T_G_to_W.rotation_matrix() * rtk_data.v;
   ROS_INFO("[RTKCorrect] RTK_W_before.P: %.6f, %.6f, %.6f, RTK time: %.6f", rtk_data.p[0], rtk_data.p[1], rtk_data.p[2], rtk_t);
   const double prop_beg_time = last_prop_end_time; 
   const double prop_end_time = lidar_meas.lio_vio_flg == LIO ? meas.lio_time : meas.vio_time;
@@ -649,10 +650,10 @@ void ImuProcess::GetRTKCorrectedState(LidarMeasureGroup &lidar_meas, const State
       PropagateTo(rtk_t);
 
       state_temp.pos_end = rtk_data.p;
+      state_temp.vel_end = rtk_data.v;
       pos_imu = state_temp.pos_end; 
 
-      state_temp.cov.block<3, 15>(0, 3).setZero(); 
-      state_temp.cov.block<15, 3>(3, 0).setZero(); 
+      state_temp.cov.setZero();
 
       PropagateTo(prop_end_time);
   }

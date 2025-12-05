@@ -226,7 +226,7 @@ public:
     feats_down_world_.reset(new PointCloudXYZI());
   };
 
-  void StateEstimation(StatesGroup &state_propagat);
+  void StateEstimation(StatesGroup &state_propagat, bool rtk_good, V3D rtk_means);
   void TransformLidar(const Eigen::Matrix3d rot, const Eigen::Vector3d t, const PointCloudXYZI::Ptr &input_cloud,
                       pcl::PointCloud<pcl::PointXYZI>::Ptr &trans_cloud);
 

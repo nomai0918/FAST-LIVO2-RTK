@@ -10,17 +10,12 @@ common:
 extrin_calib:
   extrinsic_T: [0.04165, 0.02326, -0.0284]
   extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
-  # MARS_LVIG HKisland HKairport
-  # Rcl: [0.00438814,-0.999807,-0.0191582,
-  #       -0.00978695,0.0191145,-0.999769,
-  #       0.999942,0.00457463,-0.00970118]
-  # Pcl: [0.016069, 0.0871753, -0.0718021]
-  # MARS_LVIG AMtown AMvalley
 
   Rcl: [ -0.010986, -0.999937,  0.002338,
         -0.007770, -0.002253, -0.999967,
         0.999909, -0.011004, -0.007745]
   Pcl: [ -0.061281,  0.036577, -0.038252]
+  
 
 
 
@@ -62,7 +57,7 @@ vio:
   outlier_threshold: 1000 # 78 100 156 #100 200 500 700 infinite
   img_point_cov: 100 # 100 1000 
   patch_size: 8
-  patch_pyrimid_level: 4
+  patch_pyrimid_level: 3
   normal_en: true
   raycast_en: false
   inverse_composition_en: false
@@ -83,9 +78,9 @@ lio:
   dept_err: 0.02
   beam_err: 0.05
   min_eigen_value: 0.005
-  voxel_size: 0.5 # 1.0
+  voxel_size: 2.0 # 1.0
   max_layer: 2
-  max_points_num: 50
+  max_points_num: 30
   layer_init_num: [5, 5, 5, 5, 5]
 
 local_map:  
@@ -141,8 +136,8 @@ loop:
   voxelLeafSize: 0.1
 
 opt:
-  load_data: false
-  rtk_cov: 0.1
+  load_data: true
+  rtk_cov: 0.0001
   livo2_RPY_cov: 0.00000001
   livo2_XYZ_cov: 0.0001
   loop_cov: 0.000001
